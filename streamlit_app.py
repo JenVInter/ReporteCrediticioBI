@@ -13,6 +13,7 @@ import pytesseract
 import tabula
 import re
 import numpy as np
+import requests
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 def LimpiarText(df):
@@ -30,6 +31,8 @@ def get_driver():
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-blink-features=AutomationControlled")  # Desactiva la detección de automatización
+
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
@@ -39,6 +42,46 @@ options.add_argument("--disable-gpu")
 options.add_argument("--headless")
 options.binary_location = '/usr/bin/google-chrome'
 
+
+
+def post_request_funcion_judicial(cedula_demandado):
+    url = "https://api.funcionjudicial.gob.ec/EXPEL-CONSULTA-CAUSAS-SERVICE/api/consulta-causas/informacion/buscarCausas"
+    
+    # Cuerpo de la solicitud POST con la cédula del demandado como parámetro
+    payload = {
+        "numeroCausa": "",
+        "actor": {
+            "cedulaActor": "",
+            "nombreActor": ""
+        },
+        "demandado": {
+            "cedulaDemandado": cedula_demandado,
+            "nombreDemandado": ""
+        },
+        "provincia": "",
+        "numeroFiscalia": "",
+        "recaptcha": "verdad",
+    }
+
+    # Realizar la solicitud POST
+    response = requests.post(url, json=payload)
+
+    # Comprobar el código de estado de la respuesta
+    if response.status_code == 200:
+        # La solicitud fue exitosa
+        return response.json()  # Devuelve la respuesta en formato JSON
+    else:
+        # Hubo un error con la solicitud
+        response.raise_for_status()
+
+def create_dataframe_funcion_judicial(data):
+    df = pd.DataFrame(data)
+    # Seleccionar solo las columnas deseadas
+    df_filtered = df[['idJuicio', 'estadoActual', 'fechaIngreso', 'nombreDelito']]
+    # Renombrar las columnas para mayor claridad si es necesario
+    df_filtered.columns = ['ID Juicio', 'Estado Actual', 'Fecha Ingreso', 'Nombre Delito']
+    df_filtered['Fecha Ingreso'] = pd.to_datetime(df_filtered['Fecha Ingreso'], errors='coerce').dt.strftime('%d/%m/%Y')
+    return df_filtered
 def main():
     st.title('Reporte Crediticio')
 
@@ -68,8 +111,7 @@ def main():
     if len(Id) == 10 and Id.isdigit():
         if st.button('Consultar Información'):
             # Configuración del WebDriver
-            
-            
+            driver = get_driver();
             # Inicialización de DataFrames
             df_final = pd.DataFrame()
             df_iess = pd.DataFrame()
@@ -78,50 +120,56 @@ def main():
             try:
                 st.subheader('Información Judicial', divider="gray")# Consultar información de procesos judiciales
                 try:
-                    url_procesos = 'https://procesosjudiciales.funcionjudicial.gob.ec/busqueda-filtros'
-                    driver = get_driver();
-                    driver.get(url_procesos)
-                    sleep(2)
-                    
-                    element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "mat-input-3")))
-                    # Realiza acciones con el elemento ahora que está visible
-                    print(element.text)
-
-                    # Ingresar el ID en el campo de búsqueda
-                    ProcJudicial = driver.find_element(By.ID, 'mat-input-3')
-                    ProcJudicial.send_keys(Id)
-                    sleep(5)
-
-                    # Hacer clic en el botón de búsqueda
-                    SignInButton = driver.find_element(By.XPATH, "/html/body/app-root/app-expel-filtros-busqueda/expel-sidenav/mat-sidenav-container/mat-sidenav-content/section/form/div[6]/button[1]")
-                    SignInButton.click()
-                    sleep(5)
-
-                    # Extraer información de la tabla de resultados
-                    InfoCausas = driver.find_element(By.CLASS_NAME, 'cuerpo')
-                    lineas = InfoCausas.text.split('\n')
-                    datos = [linea.split('\t') for linea in lineas]
-                    df = pd.DataFrame(datos)
-
-                    df_final = pd.DataFrame()
-                    grupos_filas = [df.iloc[i:i + 5, :] for i in range(0, len(df), 5)]
-                    grupos_transpuestos = [grupo.T for grupo in grupos_filas]
-
-                    for i, grupo_transpuesto in enumerate(grupos_transpuestos):
-                        nuevo_nombre_columnas = ['NRegistros', 'FechaIngreso', 'NumeroProceso', 'AccionInfraccion', 'Detalle']
-                        grupo_transpuesto.columns = nuevo_nombre_columnas
-                        df_final = df_final.append(grupo_transpuesto, ignore_index=True)
-
-                    df_final = df_final.drop(columns=['Detalle'])
-                    df_final.insert(loc=0, column='Identificacion', value=Id)
-                    #df_final['FechaProceso'] = datetime.today().date()
-                    #df_final['IdCJ'] = 'SI'
-
-                    # Mostrar el DataFrame sin índices visibles
-                    st.table(df_final)
+                    result = post_request_funcion_judicial(Id)
+                    df_fj = create_dataframe_funcion_judicial(result)
+                    print(df_fj)
+                    st.table(df_fj)
                 except Exception as e:
                     st.write('Sin Información encontrada')
                     print('Error en consulta judicial:', e)
+                # try:
+                #     url_procesos = 'https://procesosjudiciales.funcionjudicial.gob.ec/busqueda-filtros'
+                #     driver.get(url_procesos)
+                    
+                #     element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "mat-input-3")))
+                #     # Realiza acciones con el elemento ahora que está visible
+                #     print(element.text)
+
+                #     # Ingresar el ID en el campo de búsqueda
+                #     ProcJudicial = driver.find_element(By.ID, 'mat-input-3')
+                #     ProcJudicial.send_keys(Id)
+                #     sleep(5)
+
+                #     # Hacer clic en el botón de búsqueda
+                #     SignInButton = driver.find_element(By.XPATH, "/html/body/app-root/app-expel-filtros-busqueda/expel-sidenav/mat-sidenav-container/mat-sidenav-content/section/form/div[6]/button[1]")
+                #     SignInButton.click()
+                #     sleep(5)
+
+                #     # Extraer información de la tabla de resultados
+                #     InfoCausas = driver.find_element(By.CLASS_NAME, 'cuerpo')
+                #     lineas = InfoCausas.text.split('\n')
+                #     datos = [linea.split('\t') for linea in lineas]
+                #     df = pd.DataFrame(datos)
+
+                #     df_final = pd.DataFrame()
+                #     grupos_filas = [df.iloc[i:i + 5, :] for i in range(0, len(df), 5)]
+                #     grupos_transpuestos = [grupo.T for grupo in grupos_filas]
+
+                #     for i, grupo_transpuesto in enumerate(grupos_transpuestos):
+                #         nuevo_nombre_columnas = ['NRegistros', 'FechaIngreso', 'NumeroProceso', 'AccionInfraccion', 'Detalle']
+                #         grupo_transpuesto.columns = nuevo_nombre_columnas
+                #         df_final = df_final.append(grupo_transpuesto, ignore_index=True)
+
+                #     df_final = df_final.drop(columns=['Detalle'])
+                #     df_final.insert(loc=0, column='Identificacion', value=Id)
+                #     #df_final['FechaProceso'] = datetime.today().date()
+                #     #df_final['IdCJ'] = 'SI'
+
+                #     # Mostrar el DataFrame sin índices visibles
+                #     st.table(df_final)
+                # except Exception as e:
+                #     st.write('Sin Información encontrada')
+                #     print('Error en consulta judicial:', e)
 
                 st.subheader('Información IESS', divider="gray")
                 try:
@@ -208,6 +256,10 @@ def main():
                     url_sri = 'https://srienlinea.sri.gob.ec/sri-en-linea/SriDeclaracionesWeb/ConsultaImpuestoRenta/Consultas/consultaImpuestoRenta'
                     driver.get(url_sri)
                     sleep(2)
+                    
+                    element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//input[@id='usuario']")))
+                    # Realiza acciones con el elemento ahora que está visible
+                    print(element.text)
 
                     Idsri = '1722431101001'
                     contr = 'Victor2022*'
@@ -283,8 +335,9 @@ def main():
                 st.write('Ocurrió un error:', e)
                 
             finally:
-                driver.quit()
-
+                print('se ha ejecutado el finally')
+            
+            driver.quit()
     else:
         st.write("El valor ingresado no tiene exactamente 10 dígitos. Inténtalo de nuevo.")
 
