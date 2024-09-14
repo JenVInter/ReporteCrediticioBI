@@ -135,7 +135,7 @@ async def consulta_sri(Id):
 
 # Función principal de la aplicación Streamlit
 async def main():
-    st.title('Reporte Crediticio')
+    st.title('Reporte Crediticio Test')
 
     st.markdown(
         """
