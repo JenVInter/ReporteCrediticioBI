@@ -111,7 +111,7 @@ def main():
     if len(Id) == 10 and Id.isdigit():
         if st.button('Consultar Información'):
             # Configuración del WebDriver
-            driver = get_driver();
+            driver = get_driver()
             # Inicialización de DataFrames
             df_final = pd.DataFrame()
             df_iess = pd.DataFrame()
@@ -255,11 +255,10 @@ def main():
                 try:
                     url_sri = 'https://srienlinea.sri.gob.ec/sri-en-linea/SriDeclaracionesWeb/ConsultaImpuestoRenta/Consultas/consultaImpuestoRenta'
                     driver.get(url_sri)
-                    sleep(2)
+                    
                     
                     element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//input[@id='usuario']")))
-                    # Realiza acciones con el elemento ahora que está visible
-                    print(element.text)
+                    
 
                     Idsri = '1722431101001'
                     contr = 'Victor2022*'
@@ -267,31 +266,32 @@ def main():
                     # Ingresar credenciales
                     ProcSri = driver.find_element(By.XPATH, "//input[@id='usuario']")
                     ProcSri.click()
-                    sleep(3)
+                    # sleep(3)
                     ProcSri.send_keys(Idsri)
-                    sleep(5)
+                    # sleep(5)
 
                     ProcSRIctr = driver.find_element(By.XPATH, "//input[@id='password']")
                     ProcSRIctr.click()
-                    sleep(3)
+                    # sleep(3)
                     ProcSRIctr.send_keys(contr)
-                    sleep(5)
+                    # sleep(5)
 
                     # Iniciar sesión
                     ProcSRIclick = driver.find_element(By.XPATH, "//input[@id='kc-login']")
                     ProcSRIclick.click()
-                    sleep(5)
+                    element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//input[@id='kc-login']")))
 
                     # Ingresar el ID para la búsqueda
                     elemento_busqueda = driver.find_element(By.XPATH, "//input[@id='busquedaRucId']")
                     elemento_busqueda.click()
                     elemento_busqueda.send_keys(Id)
-                    sleep(5)
+                    
 
                     # Clic en botón de búsqueda
                     ProcSRIclick = driver.find_element(By.XPATH, "/html/body/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/div[6]/div[2]/div/div[2]/div/button")
+                    element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/div[6]/div[2]/div/div[2]/div/button")))
                     ProcSRIclick.click()
-                    sleep(5)
+                    
 
                     # Extraer información
                     InfoCausas = driver.find_element(By.XPATH, '//*[@id="sribody"]/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/sri-mostrar-impuesto-renta/div[5]/div[1]/div')
