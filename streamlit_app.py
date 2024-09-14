@@ -32,9 +32,7 @@ def get_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
 
-    #service = Service(ChromeDriverManager().install())
-    service = Service(r'C:\Users\binvelam\OneDrive - Banco Internacional S.A\Visual_studio\Proyectos\Objetivos2024\03. FuentesExternas\chromedriver.exe')
-    #st.write(service.path)
+    service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
@@ -137,7 +135,7 @@ async def consulta_sri(Id):
 
 # Función principal de la aplicación Streamlit
 async def main():
-    st.title('Reporte Crediticio')
+    st.title('Reporte Crediticio Test')
 
     st.markdown(
         """
