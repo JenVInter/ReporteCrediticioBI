@@ -177,7 +177,7 @@ async def main():
                     st.table(df_sri)
                 except Exception as e:
                     st.write('Sin información encontrada')
-                    print('Error en consulta SRI:', e)
+                    st.write( e)
 
             except Exception as e:
                 st.write('Ocurrió un error:', e)
