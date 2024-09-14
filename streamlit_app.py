@@ -22,6 +22,24 @@ def LimpiarText(df):
     df = df.apply(lambda x: x.strip())
     return df
 
+def download_chromedriver():
+    url = "https://github.com/JenVInter/ReporteCrediticioBI/raw/ca755588e447e684179ad8d6cfb9da40b129896d/driver/chromedriver.exe"
+    local_zip_path = "chromedriver.zip"
+    local_extracted_path = "chromedriver"
+
+    # Descargar el archivo zip
+    response = requests.get(url)
+    with open(local_zip_path, 'wb') as file:
+        file.write(response.content)
+
+    # Extraer el archivo zip
+    with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
+        zip_ref.extractall(local_extracted_path)
+
+    # Obtener la ruta del chromedriver
+    chromedriver_path = os.path.join(local_extracted_path, "chromedriver.exe")
+    return chromedriver_path
+
 # Función para obtener un driver de Selenium con configuraciones específicas
 
 def get_driver():
@@ -32,9 +50,8 @@ def get_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
 
-    #service = Service(ChromeDriverManager().install())
-    service = Service(r'C:\Users\binvelam\OneDrive - Banco Internacional S.A\Visual_studio\Proyectos\Objetivos2024\03. FuentesExternas\chromedriver.exe')
-    #st.write(service.path)
+    chromedriver_path = download_chromedriver()
+    service = Service(chromedriver_path)
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
