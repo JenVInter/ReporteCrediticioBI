@@ -32,6 +32,7 @@ def get_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
 
+    #options.binary_location = '/usr/bin/chromium'  # Asegúrate de apuntar al binario correcto de Chromium
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
