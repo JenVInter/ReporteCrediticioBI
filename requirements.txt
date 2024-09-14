@@ -1,6 +1,8 @@
 streamlit
 pandas
-seleniumbase
+selenium
 webdriver_manager
 pytesseract
 tabula
+aiohttp
+asyncio
