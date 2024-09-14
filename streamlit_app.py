@@ -1,7 +1,8 @@
 import streamlit as st
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
 from time import sleep
 import pandas as pd
 from datetime import datetime
@@ -20,6 +21,21 @@ def LimpiarText(df):
     return(df)
 
 def main():
+
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Ejecutar en modo headless si no necesitas interfaz gráfica
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.binary_location = '/usr/bin/google-chrome'  
+    # Reemplaza con la ruta del ejecutable de Chrome
+
+
+    # Configura el servicio del ChromeDriver
+    service = Service(ChromeDriverManager().install())
+
+    # Inicializa el WebDriver con el servicio y las opciones
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+
     st.title('Reporte Crediticio')
 
     # Mostrar imagen como logo al lado del título
@@ -48,7 +64,7 @@ def main():
     if len(Id) == 10 and Id.isdigit():
         if st.button('Consultar Información'):
             # Configuración del WebDriver
-            driver = webdriver.Chrome(ChromeDriverManager().install())
+            
             
             # Inicialización de DataFrames
             df_final = pd.DataFrame()
