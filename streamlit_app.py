@@ -32,7 +32,9 @@ def get_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
 
-    service = Service(ChromeDriverManager().install())
+    #service = Service(ChromeDriverManager().install())
+    service = Service(r'C:\Users\binvelam\OneDrive - Banco Internacional S.A\Visual_studio\Proyectos\Objetivos2024\03. FuentesExternas\chromedriver.exe')
+    #st.write(service.path)
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
