@@ -12,6 +12,7 @@ import re
 import aiohttp
 import asyncio
 import numpy as np
+import requests
 
 # Función para limpiar el texto en un DataFrame
 def LimpiarText(df):
