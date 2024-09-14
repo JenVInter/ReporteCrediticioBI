@@ -1,6 +1,6 @@
 streamlit
 pandas
-selenium
+seleniumbase
 webdriver_manager
 pytesseract
 tabula
