@@ -1,3 +1,6 @@
 streamlit
 pandas
 selenium
+webdriver_manager
+pytesseract
+tabula
