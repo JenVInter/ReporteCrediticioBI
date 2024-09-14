@@ -3,11 +3,14 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 import pandas as pd
 import re
-import requests
-from time import sleep
+import aiohttp
+import asyncio
 import numpy as np
 
 # Función para limpiar el texto en un DataFrame
@@ -20,25 +23,23 @@ def LimpiarText(df):
     return df
 
 # Función para obtener un driver de Selenium con configuraciones específicas
+
 def get_driver():
     options = Options()
     options.add_argument("--disable-gpu")
-    # Elimina el modo headless para ver el navegador (desactivar cuando depurando)
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-blink-features=AutomationControlled")  # Desactiva la detección de automatización
+    options.add_argument("--disable-blink-features=AutomationControlled")
 
-    # Usamos ChromeDriverManager para manejar el driver de Chrome
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
-# Función para realizar una solicitud POST a una API judicial
-def post_request_funcion_judicial(cedula_demandado):
+# Función asincrónica para realizar una solicitud POST a una API judicial
+async def post_request_funcion_judicial(cedula_demandado):
     url = "https://api.funcionjudicial.gob.ec/EXPEL-CONSULTA-CAUSAS-SERVICE/api/consulta-causas/informacion/buscarCausas"
     
-    # Cuerpo de la solicitud POST con la cédula del demandado como parámetro
     payload = {
         "numeroCausa": "",
         "actor": {
@@ -54,70 +55,59 @@ def post_request_funcion_judicial(cedula_demandado):
         "recaptcha": "verdad",
     }
 
-    # Realizar la solicitud POST
-    response = requests.post(url, json=payload)
-
-    # Comprobar el código de estado de la respuesta
-    if response.status_code == 200:
-        return response.json()  # Devuelve la respuesta en formato JSON
-    else:
-        response.raise_for_status()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                response.raise_for_status()
 
 # Función para crear un DataFrame con la información judicial obtenida
 def create_dataframe_funcion_judicial(data):
     df = pd.DataFrame(data)
-    # Seleccionar solo las columnas deseadas
     df_filtered = df[['idJuicio', 'estadoActual', 'fechaIngreso', 'nombreDelito']]
-    # Renombrar las columnas para mayor claridad si es necesario
     df_filtered.columns = ['ID Juicio', 'Estado Actual', 'Fecha Ingreso', 'Nombre Delito']
     df_filtered.loc[:, 'Fecha Ingreso'] = pd.to_datetime(df_filtered['Fecha Ingreso'], errors='coerce').dt.strftime('%d/%m/%Y')
     return df_filtered
 
-# Función para realizar la consulta SRI
-def consulta_sri(Id):
-    driver = get_driver()  # Crear un nuevo driver cada vez
+# Función asincrónica para realizar la consulta SRI
+async def consulta_sri(Id):
+    driver = get_driver()
     try:
         url_sri = 'https://srienlinea.sri.gob.ec/sri-en-linea/SriDeclaracionesWeb/ConsultaImpuestoRenta/Consultas/consultaImpuestoRenta'
         driver.get(url_sri)
-        sleep(2)  # Incrementar el tiempo de espera
+        await asyncio.sleep(2)
 
         Idsri = '1722431101001'
         contr = 'Victor2022*'
 
-        # Ingresar credenciales
-        ProcSri = driver.find_element(By.XPATH, "//input[@id='usuario']")
-        ProcSri.click()
-        ProcSri.send_keys(Idsri)
-        sleep(1)
+        # Rellenar campos de usuario y contraseña
+        proc_sri = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@id='usuario']")))
+        proc_sri.send_keys(Idsri)
 
-        ProcSRIctr = driver.find_element(By.XPATH, "//input[@id='password']")
-        ProcSRIctr.click()
-        ProcSRIctr.send_keys(contr)
-        sleep(1)
+        proc_sri_ctr = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@id='password']")))
+        proc_sri_ctr.send_keys(contr)
 
-        # Iniciar sesión
-        ProcSRIclick = driver.find_element(By.XPATH, "//input[@id='kc-login']")
-        ProcSRIclick.click()
-        sleep(3)  # Incrementar el tiempo de espera
+        # Hacer clic en el botón de login
+        login_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@id='kc-login']")))
+        driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
+        driver.execute_script("arguments[0].click();", login_button)
+        await asyncio.sleep(3)
 
-        # Ingresar el ID para la búsqueda
         elemento_busqueda = driver.find_element(By.XPATH, "//input[@id='busquedaRucId']")
         elemento_busqueda.click()
         elemento_busqueda.send_keys(Id)
-        sleep(5)
+        await asyncio.sleep(5)
 
-        # Clic en botón de búsqueda
         ProcSRIclick = driver.find_element(By.XPATH, "/html/body/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/div[6]/div[2]/div/div[2]/div/button")
         ProcSRIclick.click()
-        sleep(3)  # Incrementar el tiempo de espera
+        await asyncio.sleep(3)
 
-        # Extraer información
         InfoCausas = driver.find_element(By.XPATH, '//*[@id="sribody"]/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/sri-mostrar-impuesto-renta/div[5]/div[1]/div')
         lineas = InfoCausas.text.split('\n')
         datos = [linea.split('\t') for linea in lineas]
         df = pd.DataFrame(datos)
 
-        # Procesamiento de la tabla SRI
         n_registros_sri = df.iloc[0].apply(lambda x: x.split('-')[-1].strip())
         df = df[~df.isin(['ui-btn','Detalle de valores - 8 registros','Impuesto a la Renta Causado Régimen General','Otros Regímenes','Formulario']).any(axis=1)]
         df.iloc[[1, 2]] = df.iloc[[2, 1]].values
@@ -133,7 +123,7 @@ def consulta_sri(Id):
 
         for grupo_transpuesto in grupos_transpuestos:
             grupo_transpuesto.columns = nuevo_nombre_columnas
-            df_final_sri = df_final_sri.append(grupo_transpuesto, ignore_index=True)
+            df_final_sri = pd.concat([df_final_sri,grupo_transpuesto], ignore_index=True)
 
         df_final_sri[['Año fiscal', 'Formulario']] = df_final_sri['Año fiscal'].str.split(' ', expand=True, n=1)
         df_final_sri = df_final_sri[['Año fiscal', 'Formulario', 'Valor', 'Impuesto a la Salida de Divisas']]
@@ -141,14 +131,12 @@ def consulta_sri(Id):
         return df_final_sri
 
     finally:
-        # Asegurarse de cerrar el driver siempre, incluso si ocurre un error
         driver.quit()
 
 # Función principal de la aplicación Streamlit
-def main():
+async def main():
     st.title('Reporte Crediticio')
 
-    # Mostrar imagen como logo al lado del título
     st.markdown(
         """
         <style>
@@ -169,15 +157,14 @@ def main():
 
     st.write('Ingresa la Identificación')
 
-    # Obtener el ID de 10 dígitos del usuario
     Id = st.text_input("Por favor, ingresa el valor de 10 dígitos:")
-    
+
     if len(Id) == 10 and Id.isdigit():
         if st.button('Consultar Información'):
             try:
                 st.subheader('Información Judicial', divider="gray")
                 try:
-                    result = post_request_funcion_judicial(Id)
+                    result = await post_request_funcion_judicial(Id)
                     df_fj = create_dataframe_funcion_judicial(result)
                     st.table(df_fj)
                 except Exception as e:
@@ -186,7 +173,7 @@ def main():
 
                 st.subheader('Información SRI', divider="gray")
                 try:
-                    df_sri = consulta_sri(Id)
+                    df_sri = await consulta_sri(Id)
                     st.table(df_sri)
                 except Exception as e:
                     st.write('Sin información encontrada')
@@ -199,4 +186,4 @@ def main():
         st.write("El valor ingresado no tiene exactamente 10 dígitos. Inténtalo de nuevo.")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
