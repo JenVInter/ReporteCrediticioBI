@@ -7,4 +7,3 @@ tabula
 aiohttp
 asyncio
 requests
-os
