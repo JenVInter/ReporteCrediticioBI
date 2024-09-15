@@ -32,6 +32,11 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
 
     # Usa webdriver_manager para obtener la versión correcta de ChromeDriver
+    
+    # usar este service para modo desarrollo
+    # service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    
+    # usar este service para modo produccion
     service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
     print(f"ChromeDriver Version: {driver.capabilities['chrome']['chromedriverVersion']}")
