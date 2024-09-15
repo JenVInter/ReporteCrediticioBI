@@ -35,10 +35,10 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     
 # usar este service para modo desarrollo
-    service = Service(ChromeDriverManager().install())
+    # service = Service(ChromeDriverManager().install())
     
     # usar este service para modo produccion
-    #service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
