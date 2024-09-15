@@ -32,8 +32,9 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
 
     # Usa webdriver_manager para obtener la versión correcta de ChromeDriver
-    service = Service(ChromeDriverManager().install())
+    service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
+    print(f"ChromeDriver Version: {driver.capabilities['chrome']['chromedriverVersion']}")
     return driver
 
 # Función asincrónica para realizar una solicitud POST a una API judicial
