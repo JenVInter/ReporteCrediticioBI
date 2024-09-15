@@ -28,8 +28,8 @@ def LimpiarText(df):
 # Función para obtener un driver de Selenium con configuraciones específicas
 def get_driver():
     options = Options()
-    options.add_argument("--disable-gpu")
-    options.add_argument("--headless")
+    #options.add_argument("--disable-gpu")
+    #options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -162,16 +162,14 @@ async def consulta_iess(Id):
         
         boton_consulta = driver.find_element(By.XPATH, "//input[@name='frmCertificadoAfiliacion:j_id30']")
         boton_consulta.click()
-        # sleep(5)
+        sleep(12)
 
-        WebDriverWait(driver, 15).until(lambda d: len(driver.window_handles) > 1)
-
-        window_handles = driver.window_handles
-        print(window_handles)
-        original_window_handle = driver.current_window_handle
-        new_window_handle = [handle for handle in window_handles if handle != original_window_handle][0]
-        print(new_window_handle)
-        driver.switch_to.window(driver.window_handles[-1])
+        # window_handles = driver.window_handles
+        # print(window_handles)
+        # original_window_handle = driver.current_window_handle
+        # new_window_handle = [handle for handle in window_handles if handle != original_window_handle][0]
+        # print(new_window_handle)
+        driver.switch_to.window(driver.window_handles[1])
 
         print(driver.page_source)
         sleep(20)
@@ -221,7 +219,13 @@ async def consulta_iess(Id):
             df_iess = pd.concat([numero_patronalf, lugarf, estado_afiliadof, fecha_procesof], axis=1)
         
         # Limpiar los datos
-        df_iess['Lugar'] = df_iess['Lugar'].str.replace(".", "")
+        df_iess['Lugar'] = df_iess['Lugar'].str.replace(".","")
+        df_iess.at[0,'Lugar'] = df_iess.loc[0,'Lugar'].split("empresa(s):\n\n")[-1].strip()
+        df_iess.at[0,'Lugar'] = df_iess.loc[0,'Lugar'].split("empresas):\n\n")[-1].strip()
+        df_iess.at[0,'Lugar'] = df_iess.loc[0,'Lugar'].split("empresas")[-1].strip()
+        
+        df_iess.insert(loc=0, column='Identificacion', value=Id)
+        cols = ['NumeroPatronal','Estado','Lugar']
         df_iess[cols] = df_iess[cols].apply(lambda x: LimpiarText(x))
         df_iess['NumeroPatronal'] = df_iess.NumeroPatronal.astype('Int64').astype('str')
 
