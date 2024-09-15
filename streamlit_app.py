@@ -12,6 +12,7 @@ import re
 import aiohttp
 import asyncio
 import numpy as np
+import requests
 
 # Función para limpiar el texto en un DataFrame
 def LimpiarText(df):
@@ -21,6 +22,17 @@ def LimpiarText(df):
     df = df.map(lambda x: re.sub("\s+", ' ', x))
     df = df.apply(lambda x: x.strip())
     return df
+
+def download_chromedriver():
+    url = "https://github.com/JenVInter/ReporteCrediticioBI/raw/ca755588e447e684179ad8d6cfb9da40b129896d/driver/chromedriver.exe"
+    local_path = "chromedriver.exe"
+
+    # Descargar el archivo
+    response = requests.get(url)
+    with open(local_path, 'wb') as file:
+        file.write(response.content)
+
+    return local_path
 
 # Función para obtener un driver de Selenium con configuraciones específicas
 
@@ -32,7 +44,9 @@ def get_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
 
-    service = Service(ChromeDriverManager().install())
+    #service = Service(ChromeDriverManager().install())
+    service = Service(r'C:\Users\binvelam\OneDrive - Banco Internacional S.A\Visual_studio\Proyectos\Objetivos2024\03. FuentesExternas\chromedriver.exe')
+    #st.write(service.path)
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
