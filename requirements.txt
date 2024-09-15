@@ -7,3 +7,5 @@ tabula
 aiohttp
 asyncio
 requests
+numpy
+Pillow

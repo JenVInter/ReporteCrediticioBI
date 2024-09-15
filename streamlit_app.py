@@ -11,6 +11,10 @@ import re
 import aiohttp
 import asyncio
 import numpy as np
+from PIL import Image
+import pytesseract
+from time import sleep
+import os
 
 # Función para limpiar el texto en un DataFrame
 def LimpiarText(df):
@@ -22,7 +26,6 @@ def LimpiarText(df):
     return df
 
 # Función para obtener un driver de Selenium con configuraciones específicas
-
 def get_driver():
     options = Options()
     options.add_argument("--disable-gpu")
@@ -30,16 +33,13 @@ def get_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
-
-    # Usa webdriver_manager para obtener la versión correcta de ChromeDriver
     
-    # usar este service para modo desarrollo
-    # service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+# usar este service para modo desarrollo
+    service = Service(ChromeDriverManager().install())
     
     # usar este service para modo produccion
-    service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    #service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
-    print(f"ChromeDriver Version: {driver.capabilities['chrome']['chromedriverVersion']}")
     return driver
 
 # Función asincrónica para realizar una solicitud POST a una API judicial
@@ -139,9 +139,103 @@ async def consulta_sri(Id):
     finally:
         driver.quit()
 
+# Función asincrónica para realizar la consulta IESS
+async def consulta_iess(Id):
+    driver = get_driver()
+    try:
+        url = 'https://www.iess.gob.ec/iess-kiosko-web/pages/public/afiliacion/certificadoAfiliacion.jsf'
+        driver.get(url)
+        sleep(2)
+        
+        ProcIESS = driver.find_element(By.XPATH, "//input[@id='frmCertificadoAfiliacion:cedulaIn']")
+        ProcIESS.click()
+        sleep(3)
+
+        for numero in Id:
+            boton_numero = driver.find_element(By.CSS_SELECTOR, f"button[title='{numero}']")  # Ajusta el CSS Selector según la estructura HTML de tu teclado
+            boton_numero.click()
+
+        sleep(3)
+
+        boton_cierre = driver.find_element(By.XPATH, "//button[normalize-space()='.']")
+        boton_cierre.click()
+        
+        boton_consulta = driver.find_element(By.XPATH, "//input[@name='frmCertificadoAfiliacion:j_id30']")
+        boton_consulta.click()
+        # sleep(5)
+
+        WebDriverWait(driver, 15).until(lambda d: len(driver.window_handles) > 1)
+
+        window_handles = driver.window_handles
+        print(window_handles)
+        original_window_handle = driver.current_window_handle
+        new_window_handle = [handle for handle in window_handles if handle != original_window_handle][0]
+        print(new_window_handle)
+        driver.switch_to.window(driver.window_handles[-1])
+
+        print(driver.page_source)
+        sleep(20)
+        # screenshot_bytes = driver.get_screenshot_as_png()
+        screenshot_path = 'images/IESS_Reporte.png'
+        os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+
+        savesc = driver.save_screenshot(screenshot_path)
+        print(savesc)
+        sleep(3)
+
+        imagen = Image.open(screenshot_path)
+        # st.image(imagen.b, caption='Captura de Pantalla', use_column_width=True)
+        coordenadas = (150, 200, 750, 345)
+        imagen.crop(coordenadas).save(screenshot_path)
+
+        # Cargar la imagen
+        imagen = Image.open(screenshot_path)
+        # Utilizar pytesseract para extraer texto
+        texto_extraido = pytesseract.image_to_string(imagen)
+
+        # Expresiones regulares para extraer datos
+        patron_patronal = r'(?:Ni|N)imero Patronal:\s*(\d+)'
+        patron_lugar = r'\d+(.*?)con RUC'
+        patron_lugar2 = r'afiliacion a\s*(.*?)\s*con RUC'
+        patron_afiliado = r'afiliado es:\s*([\w]+)'
+        patron_fecha = r'\d{4}-\d{1,2}'
+
+        # Extraer los datos
+        numero_patronal = re.findall(patron_patronal, texto_extraido, re.DOTALL)
+        lugar = re.findall(patron_lugar, texto_extraido, re.DOTALL)
+        lugar2 = re.findall(patron_lugar2, texto_extraido, re.DOTALL)
+        estado_afiliado = texto_extraido.split("afiliado es:")[1].split("\n")[0].strip()
+        fecha_proceso = re.findall(patron_fecha, texto_extraido)
+
+        if len(numero_patronal) > 1:
+            numero_patronalf = pd.DataFrame(numero_patronal, columns=['NumeroPatronal'])
+            lugarf = pd.DataFrame(lugar, columns=['Lugar'])
+            estado_afiliadof = pd.DataFrame({'Estado': [estado_afiliado] * len(numero_patronal)})
+            fecha_procesof = pd.DataFrame({'UltimaFechaAfiliacion': [fecha_proceso[0]] * len(numero_patronal)})
+            df_iess = pd.concat([numero_patronalf, lugarf, estado_afiliadof, fecha_procesof], axis=1)
+        else:
+            numero_patronalf = pd.DataFrame(numero_patronal, columns=['NumeroPatronal'])
+            lugarf = pd.DataFrame(lugar, columns=['Lugar'])
+            estado_afiliadof = pd.DataFrame({'Estado': [estado_afiliado]})
+            fecha_procesof = pd.DataFrame({'UltimaFechaAfiliacion': [fecha_proceso[0]]})
+            df_iess = pd.concat([numero_patronalf, lugarf, estado_afiliadof, fecha_procesof], axis=1)
+        
+        # Limpiar los datos
+        df_iess['Lugar'] = df_iess['Lugar'].str.replace(".", "")
+        df_iess[cols] = df_iess[cols].apply(lambda x: LimpiarText(x))
+        df_iess['NumeroPatronal'] = df_iess.NumeroPatronal.astype('Int64').astype('str')
+
+        df_iess = df_iess.assign(Estado=np.where((df_iess.Estado.str.contains("ACTIV", regex=True, flags=re.IGNORECASE)), "ACTIVO",
+                                                np.where((df_iess.Estado.str.contains("JUBIL", regex=True, flags=re.IGNORECASE)), "JUBILADO",
+                                                         np.where((df_iess.Estado.str.contains("FALLECID", regex=True, flags=re.IGNORECASE)), "FALLECIDO", df_iess.Estado))))
+        return df_iess
+
+    finally:
+        driver.quit()
+
 # Función principal de la aplicación Streamlit
 async def main():
-    st.title('Reporte Crediticio Test')
+    st.title('Reporte Crediticio')
 
     st.markdown(
         """
@@ -183,7 +277,15 @@ async def main():
                     st.table(df_sri)
                 except Exception as e:
                     st.write('Sin información encontrada')
-                    st.write( e)
+                    st.write(e)
+
+                st.subheader('Información IESS', divider="gray")
+                try:
+                    df_iess = await consulta_iess(Id)
+                    st.table(df_iess)
+                except Exception as e:
+                    st.write('Sin información encontrada')
+                    st.write(e)
 
             except Exception as e:
                 st.write('Ocurrió un error:', e)
