@@ -15,6 +15,7 @@ from PIL import Image
 import pytesseract
 from time import sleep
 import os
+import tempfile
 
 # Función para limpiar el texto en un DataFrame
 def LimpiarText(df):
@@ -35,10 +36,10 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     
 # usar este service para modo desarrollo
-    # service = Service(ChromeDriverManager().install())
+    service = Service(ChromeDriverManager().install())
     
     # usar este service para modo produccion
-    service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    #service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
@@ -157,28 +158,36 @@ async def consulta_iess(Id):
 
         sleep(3)
 
-        boton_cierre = driver.find_element(By.XPATH, "//button[normalize-space()='.']")
-        boton_cierre.click()
-        
-        boton_consulta = driver.find_element(By.XPATH, "//input[@name='frmCertificadoAfiliacion:j_id30']")
-        boton_consulta.click()
-        sleep(12)
-
-        # window_handles = driver.window_handles
-        # print(window_handles)
-        # original_window_handle = driver.current_window_handle
-        # new_window_handle = [handle for handle in window_handles if handle != original_window_handle][0]
-        # print(new_window_handle)
-        driver.switch_to.window(driver.window_handles[1])
-
-        print(driver.page_source)
-        sleep(20)
-        # screenshot_bytes = driver.get_screenshot_as_png()
-        screenshot_path = 'images/IESS_Reporte.png'
+        screenshot_path = 'images/IESS_Reporte2.png'
         os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
 
+        boton_cierre = driver.find_element(By.XPATH, "//button[normalize-space()='.']")
+        boton_cierre.click()
+
+        boton_consulta = driver.find_element(By.XPATH, "//input[@name='frmCertificadoAfiliacion:j_id30']")
+        boton_consulta.click()
+        
+        WebDriverWait(driver, 15).until(lambda d: len(driver.window_handles) > 1)
+        # driver.execute_script("""
+        #     window.addEventListener('beforeunload', function(event) {
+        #         // Prevenir que la ventana se cierre
+        #         event.preventDefault();
+        #         event.returnValue = ''; // Chrome requiere que esto esté presente
+        #     });
+
+        #     // También agregar un manejador para cualquier intento de cerrar la ventana
+        #     window.addEventListener('unload', function(event) {
+        #          event.preventDefault();
+        #         event.returnValue = ''; // Chrome requiere que esto esté presente
+        #     });
+        # """) 
+        driver.switch_to.window(driver.window_handles[1])
+
+        #screenshot_bytes = driver.get_screenshot_as_png()
         savesc = driver.save_screenshot(screenshot_path)
-        print(savesc)
+        window_handles = driver.window_handles
+        print(window_handles)
+        print('Listo')
         sleep(3)
 
         imagen = Image.open(screenshot_path)
