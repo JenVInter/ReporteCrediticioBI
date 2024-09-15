@@ -6,3 +6,5 @@ pytesseract
 tabula
 aiohttp
 asyncio
+requests
+os
