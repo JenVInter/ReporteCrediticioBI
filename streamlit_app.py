@@ -15,6 +15,10 @@ from PIL import Image
 import pytesseract
 from time import sleep
 import os
+import glob
+import tabula
+import shutil
+import tempfile
 
 # Función para limpiar el texto en un DataFrame
 def LimpiarText(df):
@@ -25,20 +29,27 @@ def LimpiarText(df):
     df = df.apply(lambda x: x.strip())
     return df
 
+
+
 # Función para obtener un driver de Selenium con configuraciones específicas
 def get_driver():
+    # directorio temporal
+    temp_dir = tempfile.mkdtemp()
     options = Options()
     options.add_argument("--disable-gpu")
-    options.add_argument("--headless")
+    #options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
     
-# usar este service para modo desarrollo
-    service = Service(ChromeDriverManager().install())
+    prefs = {
+        "download.default_directory": temp_dir,  # Directorio temporal
+        "download.prompt_for_download": False,   # No mostrar cuadro de diálogo
+        "plugins.always_open_pdf_externally": True  # Descargar automáticamente los PDFs
+    }   
     
-    # usar este service para modo produccion
-    #service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    options.add_experimental_option("prefs", prefs)
+    service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
@@ -98,17 +109,17 @@ async def consulta_sri(Id):
         login_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@id='kc-login']")))
         driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
         driver.execute_script("arguments[0].click();", login_button)
-        await asyncio.sleep(3)
 
+        elemento_busqueda = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//input[@id='busquedaRucId']")))
         elemento_busqueda = driver.find_element(By.XPATH, "//input[@id='busquedaRucId']")
         elemento_busqueda.click()
         elemento_busqueda.send_keys(Id)
-        await asyncio.sleep(5)
 
+        ProcSRIclick = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "/html/body/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/div[6]/div[2]/div/div[2]/div/button")))
         ProcSRIclick = driver.find_element(By.XPATH, "/html/body/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/div[6]/div[2]/div/div[2]/div/button")
         ProcSRIclick.click()
-        await asyncio.sleep(3)
 
+        InfoCausas = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//*[@id='sribody']/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/sri-mostrar-impuesto-renta/div[5]/div[1]/div")))
         InfoCausas = driver.find_element(By.XPATH, '//*[@id="sribody"]/sri-root/div/div[2]/div/div/sri-impuesto-renta-web-app/div/sri-impuesto-renta/div[1]/sri-mostrar-impuesto-renta/div[5]/div[1]/div')
         lineas = InfoCausas.text.split('\n')
         datos = [linea.split('\t') for linea in lineas]
@@ -123,7 +134,7 @@ async def consulta_sri(Id):
         nuevo_nombre_columnas = df.iloc[:3].astype(str).T.values.flatten().tolist()
         df = df[3:].reset_index(drop=True)
         df = df.replace('USD', '', regex=True)
-        df = df.replace(',', '.', regex=True)
+        #df = df.replace(',', '.', regex=True)
         grupos_filas = [df.iloc[i:i+3, :] for i in range(0, len(df), 3)]
         grupos_transpuestos = [grupo.T for grupo in grupos_filas]
 
@@ -139,103 +150,73 @@ async def consulta_sri(Id):
     finally:
         driver.quit()
 
-# Función asincrónica para realizar la consulta IESS
-async def consulta_iess(Id):
+# Función para descargar y leer el PDF desde MSP
+def descargar_y_leer_pdf(Id):
     driver = get_driver()
+    # Ruta de la carpeta de descargas
+    downloads_folder = tempfile.gettempdir()
     try:
-        url = 'https://www.iess.gob.ec/iess-kiosko-web/pages/public/afiliacion/certificadoAfiliacion.jsf'
+        url = 'https://coberturasalud.msp.gob.ec/'
         driver.get(url)
         sleep(2)
-        
-        ProcIESS = driver.find_element(By.XPATH, "//input[@id='frmCertificadoAfiliacion:cedulaIn']")
-        ProcIESS.click()
+
+        ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[2]/div/div")
+        ProcMsp.click()
+        ProcMsp = driver.find_element(By.XPATH, "//*[@id='cedula']")
+        ProcMsp.send_keys(Id)
+        ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[5]/div/button[1]")
+        ProcMsp.click()
         sleep(3)
 
-        for numero in Id:
-            boton_numero = driver.find_element(By.CSS_SELECTOR, f"button[title='{numero}']")  # Ajusta el CSS Selector según la estructura HTML de tu teclado
-            boton_numero.click()
+        pdf_element = driver.find_element(By.TAG_NAME, 'embed')  # Puede ser 'iframe' o 'embed'
+        pdf_url = pdf_element.get_attribute('src')
+        print(f"URL del PDF: {pdf_url}")
+        # Descargar el PDF
+        print("Archivos en la carpeta de descargas antes de descargar:", glob.glob(os.path.join(downloads_folder, "*.pdf")))
+        driver.get(pdf_url)
+        sleep(3)  
+        print("Archivos en la carpeta de descargas después de descargar:", glob.glob(os.path.join(downloads_folder, "*.pdf")))
 
-        sleep(3)
 
-        boton_cierre = driver.find_element(By.XPATH, "//button[normalize-space()='.']")
-        boton_cierre.click()
-        
-        boton_consulta = driver.find_element(By.XPATH, "//input[@name='frmCertificadoAfiliacion:j_id30']")
-        boton_consulta.click()
-        sleep(12)
+        # Buscar los archivos PDF en la carpeta de descargas
+        pdf_files = glob.glob(os.path.join(downloads_folder, "*.pdf"))
 
-        # window_handles = driver.window_handles
-        # print(window_handles)
-        # original_window_handle = driver.current_window_handle
-        # new_window_handle = [handle for handle in window_handles if handle != original_window_handle][0]
-        # print(new_window_handle)
-        driver.switch_to.window(driver.window_handles[1])
+        # Ordenar por fecha de modificación y seleccionar el más reciente
+        if pdf_files:
+            latest_pdf = max(pdf_files, key=os.path.getmtime)
 
-        print(driver.page_source)
-        sleep(20)
-        # screenshot_bytes = driver.get_screenshot_as_png()
-        screenshot_path = 'images/IESS_Reporte.png'
-        os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
-
-        savesc = driver.save_screenshot(screenshot_path)
-        print(savesc)
-        sleep(3)
-
-        imagen = Image.open(screenshot_path)
-        # st.image(imagen.b, caption='Captura de Pantalla', use_column_width=True)
-        coordenadas = (150, 200, 750, 345)
-        imagen.crop(coordenadas).save(screenshot_path)
-
-        # Cargar la imagen
-        imagen = Image.open(screenshot_path)
-        # Utilizar pytesseract para extraer texto
-        texto_extraido = pytesseract.image_to_string(imagen)
-
-        # Expresiones regulares para extraer datos
-        patron_patronal = r'(?:Ni|N)imero Patronal:\s*(\d+)'
-        patron_lugar = r'\d+(.*?)con RUC'
-        patron_lugar2 = r'afiliacion a\s*(.*?)\s*con RUC'
-        patron_afiliado = r'afiliado es:\s*([\w]+)'
-        patron_fecha = r'\d{4}-\d{1,2}'
-
-        # Extraer los datos
-        numero_patronal = re.findall(patron_patronal, texto_extraido, re.DOTALL)
-        lugar = re.findall(patron_lugar, texto_extraido, re.DOTALL)
-        lugar2 = re.findall(patron_lugar2, texto_extraido, re.DOTALL)
-        estado_afiliado = texto_extraido.split("afiliado es:")[1].split("\n")[0].strip()
-        fecha_proceso = re.findall(patron_fecha, texto_extraido)
-
-        if len(numero_patronal) > 1:
-            numero_patronalf = pd.DataFrame(numero_patronal, columns=['NumeroPatronal'])
-            lugarf = pd.DataFrame(lugar, columns=['Lugar'])
-            estado_afiliadof = pd.DataFrame({'Estado': [estado_afiliado] * len(numero_patronal)})
-            fecha_procesof = pd.DataFrame({'UltimaFechaAfiliacion': [fecha_proceso[0]] * len(numero_patronal)})
-            df_iess = pd.concat([numero_patronalf, lugarf, estado_afiliadof, fecha_procesof], axis=1)
+            # Leer las tablas del archivo PDF
+            try:
+                # Extraer tablas
+                tables = tabula.read_pdf(latest_pdf, multiple_tables=True)
+                
+                # Crear DataFrames separados para cada tabla
+                dataframes = []
+                for i, table in enumerate(tables):
+                    df = pd.DataFrame(table)
+                    # Cambiar nombres de columnas
+                    df.rename(columns={
+                        'Tipo de Seguro': 'TipoSeguro',
+                        'Registro de Cobertura de Atención de Salud': 'CoberturaSalud'
+                    }, inplace=True)
+                    # Eliminar columna Mensaje
+                    if 'Mensaje' in df.columns:
+                        df.drop(columns=['Mensaje'], inplace=True)
+                    # Eliminar los NA de la columna 'Seguro'
+                    if 'Seguro' in df.columns:
+                        df = df.dropna(subset=['Seguro'])
+                    dataframes.append(df)
+                
+                return dataframes
+            except Exception as e:
+                print(f"Error al leer el PDF: {e}")
+                return []
         else:
-            numero_patronalf = pd.DataFrame(numero_patronal, columns=['NumeroPatronal'])
-            lugarf = pd.DataFrame(lugar, columns=['Lugar'])
-            estado_afiliadof = pd.DataFrame({'Estado': [estado_afiliado]})
-            fecha_procesof = pd.DataFrame({'UltimaFechaAfiliacion': [fecha_proceso[0]]})
-            df_iess = pd.concat([numero_patronalf, lugarf, estado_afiliadof, fecha_procesof], axis=1)
-        
-        # Limpiar los datos
-        df_iess['Lugar'] = df_iess['Lugar'].str.replace(".","")
-        df_iess.at[0,'Lugar'] = df_iess.loc[0,'Lugar'].split("empresa(s):\n\n")[-1].strip()
-        df_iess.at[0,'Lugar'] = df_iess.loc[0,'Lugar'].split("empresas):\n\n")[-1].strip()
-        df_iess.at[0,'Lugar'] = df_iess.loc[0,'Lugar'].split("empresas")[-1].strip()
-        
-        df_iess.insert(loc=0, column='Identificacion', value=Id)
-        cols = ['NumeroPatronal','Estado','Lugar']
-        df_iess[cols] = df_iess[cols].apply(lambda x: LimpiarText(x))
-        df_iess['NumeroPatronal'] = df_iess.NumeroPatronal.astype('Int64').astype('str')
-
-        df_iess = df_iess.assign(Estado=np.where((df_iess.Estado.str.contains("ACTIV", regex=True, flags=re.IGNORECASE)), "ACTIVO",
-                                                np.where((df_iess.Estado.str.contains("JUBIL", regex=True, flags=re.IGNORECASE)), "JUBILADO",
-                                                         np.where((df_iess.Estado.str.contains("FALLECID", regex=True, flags=re.IGNORECASE)), "FALLECIDO", df_iess.Estado))))
-        return df_iess
-
+            print("No se encontraron archivos PDF en la carpeta de descargas.")
+            return []
     finally:
-        driver.quit()
+        print('J¿Hi')
+        # driver.quit()
 
 # Función principal de la aplicación Streamlit
 async def main():
@@ -282,13 +263,15 @@ async def main():
                 except Exception as e:
                     st.write('Sin información encontrada')
                     st.write(e)
-
-                st.subheader('Información IESS', divider="gray")
+                    
+                st.subheader('Cobertura de Salud', divider="gray")
                 try:
-                    df_iess = await consulta_iess(Id)
-                    st.table(df_iess)
+                    dataframes = descargar_y_leer_pdf(Id)
+                    for i, df in enumerate(dataframes):
+                        st.write(f"Tabla {i+1}")
+                        st.table(df)
                 except Exception as e:
-                    st.write('Sin información encontrada')
+                    st.write('Error al leer la información de cobertura de salud')
                     st.write(e)
 
             except Exception as e:
