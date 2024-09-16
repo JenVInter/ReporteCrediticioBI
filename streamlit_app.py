@@ -42,7 +42,7 @@ def get_driver():
 
     options = Options()
     options.add_argument("--disable-gpu")
-    options.add_argument("--headless")
+    #options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -166,7 +166,7 @@ async def consulta_cobertura_salud(Id):
         url = 'https://coberturasalud.msp.gob.ec/'
         driver.get(url)
         sleep(2)
-        print('Listo')
+        
         ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[2]/div/div")
         ProcMsp.click()
         ProcMsp = driver.find_element(By.XPATH, "//*[@id='cedula']")
@@ -174,9 +174,9 @@ async def consulta_cobertura_salud(Id):
         ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[5]/div/button[1]")
         ProcMsp.click()
         sleep(3)
-        print('Listo')
+        
         pdf_element = driver.find_element(By.TAG_NAME, 'embed')  # Puede ser 'iframe' o 'embed'
-        pdf_url = pdf_element.getAttribute('src')
+        pdf_url = pdf_element.get_attribute('src')
         driver.get(pdf_url)
         sleep(3)
 
