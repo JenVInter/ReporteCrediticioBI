@@ -20,6 +20,8 @@ import tabula
 import shutil
 import tempfile
 
+# version estable
+
 # Función para limpiar el texto en un DataFrame
 def LimpiarText(df):
     df = df.map(lambda x: re.sub('S.A.', 'SA', x))  
