@@ -166,7 +166,7 @@ async def consulta_cobertura_salud(Id):
         url = 'https://coberturasalud.msp.gob.ec/'
         driver.get(url)
         sleep(2)
-        
+        print('Listo')
         ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[2]/div/div")
         ProcMsp.click()
         ProcMsp = driver.find_element(By.XPATH, "//*[@id='cedula']")
@@ -174,7 +174,15 @@ async def consulta_cobertura_salud(Id):
         ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[5]/div/button[1]")
         ProcMsp.click()
         sleep(3)
+        print('Listo')
+        # Asegurarse de que el directorio images/ existe
+        if not os.path.exists("images"):
+            os.makedirs("images")
         
+        # Captura de pantalla
+        screenshot_path = f"images/cobertura_salud_{Id}.png"
+        driver.save_screenshot(screenshot_path)
+
         pdf_element = driver.find_element(By.TAG_NAME, 'embed')  # Puede ser 'iframe' o 'embed'
         pdf_url = pdf_element.get_attribute('src')
         driver.get(pdf_url)
