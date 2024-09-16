@@ -42,7 +42,7 @@ def get_driver():
 
     options = Options()
     options.add_argument("--disable-gpu")
-    options.add_argument("--headless")
+    #options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -55,10 +55,10 @@ def get_driver():
     
     options.add_experimental_option("prefs", prefs)
     # usar este service para modo desarrollo
-    #service = Service(ChromeDriverManager().install())
+    service = Service(ChromeDriverManager().install())
     
     # usar este service para modo produccion
-    service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    #service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
@@ -179,9 +179,6 @@ async def consulta_cobertura_salud(Id):
         if not os.path.exists("images"):
             os.makedirs("images")
         
-        # Captura de pantalla
-        screenshot_path = f"images/cobertura_salud_{Id}.png"
-        driver.save_screenshot(screenshot_path)
 
         pdf_element = driver.find_element(By.TAG_NAME, 'embed')  # Puede ser 'iframe' o 'embed'
         pdf_url = pdf_element.get_attribute('src')
