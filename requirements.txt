@@ -9,3 +9,4 @@ asyncio
 requests
 numpy
 Pillow
+tesseract
