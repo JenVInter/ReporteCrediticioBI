@@ -15,9 +15,12 @@ from PIL import Image
 import pytesseract
 from time import sleep
 import os
+<<<<<<< HEAD
 import glob
 import tabula
 import shutil
+=======
+>>>>>>> 006df1905a844502ce377904363373f0a4fd4c44
 import tempfile
 
 # Función para limpiar el texto en un DataFrame
@@ -182,6 +185,7 @@ def descargar_y_leer_pdf(Id):
         print("Archivos en la carpeta de descargas después de descargar:", glob.glob(os.path.join(downloads_folder, "*.pdf")))
 
 
+<<<<<<< HEAD
         # Buscar los archivos PDF en la carpeta de descargas
         pdf_files = glob.glob(os.path.join(downloads_folder, "*.pdf"))
 
@@ -215,6 +219,70 @@ def descargar_y_leer_pdf(Id):
             except Exception as e:
                 print(f"Error al leer el PDF: {e}")
                 return []
+=======
+        screenshot_path = 'images/IESS_Reporte2.png'
+        os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+
+        boton_cierre = driver.find_element(By.XPATH, "//button[normalize-space()='.']")
+        boton_cierre.click()
+
+        boton_consulta = driver.find_element(By.XPATH, "//input[@name='frmCertificadoAfiliacion:j_id30']")
+        boton_consulta.click()
+        
+        WebDriverWait(driver, 15).until(lambda d: len(driver.window_handles) > 1)
+        # driver.execute_script("""
+        #     window.addEventListener('beforeunload', function(event) {
+        #         // Prevenir que la ventana se cierre
+        #         event.preventDefault();
+        #         event.returnValue = ''; // Chrome requiere que esto esté presente
+        #     });
+
+        #     // También agregar un manejador para cualquier intento de cerrar la ventana
+        #     window.addEventListener('unload', function(event) {
+        #          event.preventDefault();
+        #         event.returnValue = ''; // Chrome requiere que esto esté presente
+        #     });
+        # """) 
+        driver.switch_to.window(driver.window_handles[1])
+
+        #screenshot_bytes = driver.get_screenshot_as_png()
+        savesc = driver.save_screenshot(screenshot_path)
+        window_handles = driver.window_handles
+        print(window_handles)
+        print('Listo')
+        sleep(3)
+
+        imagen = Image.open(screenshot_path)
+        # st.image(imagen.b, caption='Captura de Pantalla', use_column_width=True)
+        coordenadas = (150, 200, 750, 345)
+        imagen.crop(coordenadas).save(screenshot_path)
+
+        # Cargar la imagen
+        imagen = Image.open(screenshot_path)
+        # Utilizar pytesseract para extraer texto
+        texto_extraido = pytesseract.image_to_string(imagen)
+
+        # Expresiones regulares para extraer datos
+        patron_patronal = r'(?:Ni|N)imero Patronal:\s*(\d+)'
+        patron_lugar = r'\d+(.*?)con RUC'
+        patron_lugar2 = r'afiliacion a\s*(.*?)\s*con RUC'
+        patron_afiliado = r'afiliado es:\s*([\w]+)'
+        patron_fecha = r'\d{4}-\d{1,2}'
+
+        # Extraer los datos
+        numero_patronal = re.findall(patron_patronal, texto_extraido, re.DOTALL)
+        lugar = re.findall(patron_lugar, texto_extraido, re.DOTALL)
+        lugar2 = re.findall(patron_lugar2, texto_extraido, re.DOTALL)
+        estado_afiliado = texto_extraido.split("afiliado es:")[1].split("\n")[0].strip()
+        fecha_proceso = re.findall(patron_fecha, texto_extraido)
+
+        if len(numero_patronal) > 1:
+            numero_patronalf = pd.DataFrame(numero_patronal, columns=['NumeroPatronal'])
+            lugarf = pd.DataFrame(lugar, columns=['Lugar'])
+            estado_afiliadof = pd.DataFrame({'Estado': [estado_afiliado] * len(numero_patronal)})
+            fecha_procesof = pd.DataFrame({'UltimaFechaAfiliacion': [fecha_proceso[0]] * len(numero_patronal)})
+            df_iess = pd.concat([numero_patronalf, lugarf, estado_afiliadof, fecha_procesof], axis=1)
+>>>>>>> 006df1905a844502ce377904363373f0a4fd4c44
         else:
             print("No se encontraron archivos PDF en la carpeta de descargas.")
             return []
