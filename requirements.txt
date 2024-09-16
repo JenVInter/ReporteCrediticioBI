@@ -10,3 +10,4 @@ requests
 numpy
 Pillow
 tesseract
+flask
