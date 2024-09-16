@@ -36,7 +36,10 @@ def LimpiarText(df):
 # Función para obtener un driver de Selenium con configuraciones específicas
 def get_driver():
     # directorio temporal
-    temp_dir = tempfile.mkdtemp()
+    images_folder = "images"
+    if not os.path.exists(images_folder):
+        os.makedirs(images_folder)
+
     options = Options()
     options.add_argument("--disable-gpu")
     options.add_argument("--headless")
@@ -45,17 +48,17 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     
     prefs = {
-        "download.default_directory": temp_dir,  # Directorio temporal
+        "download.default_directory": os.path.abspath(images_folder),  # Directorio temporal
         "download.prompt_for_download": False,   # No mostrar cuadro de diálogo
-        "plugins.always_open_pdf_externally": True  # Descargar automáticamente los PDFs
+        "plugins.directory_upgrade": True  # Descargar automáticamente los PDFs
     }   
     
     options.add_experimental_option("prefs", prefs)
-# usar este service para modo desarrollo
-    #service = Service(ChromeDriverManager().install())
+    # usar este service para modo desarrollo
+    service = Service(ChromeDriverManager().install())
     
     # usar este service para modo produccion
-    service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
+    #service = Service(ChromeDriverManager(driver_version='120.0.6099.224').install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
@@ -156,16 +159,14 @@ async def consulta_sri(Id):
     finally:
         driver.quit()
 
-# Función para descargar y leer el PDF desde MSP
-def descargar_y_leer_pdf(Id):
+# Función para realizar la consulta en Cobertura Salud MSP
+async def consulta_cobertura_salud(Id):
     driver = get_driver()
-    # Ruta de la carpeta de descargas
-    downloads_folder = tempfile.gettempdir()
     try:
         url = 'https://coberturasalud.msp.gob.ec/'
         driver.get(url)
         sleep(2)
-
+        print('Listo')
         ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[2]/div/div")
         ProcMsp.click()
         ProcMsp = driver.find_element(By.XPATH, "//*[@id='cedula']")
@@ -173,56 +174,42 @@ def descargar_y_leer_pdf(Id):
         ProcMsp = driver.find_element(By.XPATH, "/html/body/div/div[1]/div[2]/div[1]/div[5]/div/button[1]")
         ProcMsp.click()
         sleep(3)
-
+        print('Listo')
         pdf_element = driver.find_element(By.TAG_NAME, 'embed')  # Puede ser 'iframe' o 'embed'
-        pdf_url = pdf_element.get_attribute('src')
-        print(f"URL del PDF: {pdf_url}")
-        # Descargar el PDF
-        print("Archivos en la carpeta de descargas antes de descargar:", glob.glob(os.path.join(downloads_folder, "*.pdf")))
+        pdf_url = pdf_element.getAttribute('src')
         driver.get(pdf_url)
-        sleep(3)  
-        print("Archivos en la carpeta de descargas después de descargar:", glob.glob(os.path.join(downloads_folder, "*.pdf")))
+        sleep(3)
 
-
-        # Buscar los archivos PDF en la carpeta de descargas
+        downloads_folder = "images"
         pdf_files = glob.glob(os.path.join(downloads_folder, "*.pdf"))
 
-        # Ordenar por fecha de modificación y seleccionar el más reciente
         if pdf_files:
             latest_pdf = max(pdf_files, key=os.path.getmtime)
 
-            # Leer las tablas del archivo PDF
             try:
-                # Extraer tablas
-                tables = tabula.read_pdf(latest_pdf, multiple_tables=True)
-                
-                # Crear DataFrames separados para cada tabla
-                dataframes = []
-                for i, table in enumerate(tables):
-                    df = pd.DataFrame(table)
-                    # Cambiar nombres de columnas
+                tables = tabula.read_pdf(latest_pdf, pages='all', multiple_tables=True)
+                if tables:
+                    df = pd.DataFrame(tables[0])
                     df.rename(columns={
                         'Tipo de Seguro': 'TipoSeguro',
                         'Registro de Cobertura de Atención de Salud': 'CoberturaSalud'
                     }, inplace=True)
-                    # Eliminar columna Mensaje
+
                     if 'Mensaje' in df.columns:
                         df.drop(columns=['Mensaje'], inplace=True)
-                    # Eliminar los NA de la columna 'Seguro'
+
                     if 'Seguro' in df.columns:
                         df = df.dropna(subset=['Seguro'])
-                    dataframes.append(df)
-                
-                return dataframes
+
+                    return df
+                else:
+                    print("No se encontraron tablas en el PDF.")
             except Exception as e:
                 print(f"Error al leer el PDF: {e}")
-                return []
-        else:
-            print("No se encontraron archivos PDF en la carpeta de descargas.")
-            return []
+
     finally:
-        print('J¿Hi')
-        # driver.quit()
+        driver.quit()
+
 
 # Función principal de la aplicación Streamlit
 async def main():
@@ -269,15 +256,13 @@ async def main():
                 except Exception as e:
                     st.write('Sin información encontrada')
                     st.write(e)
-                    
+                
                 st.subheader('Cobertura de Salud', divider="gray")
                 try:
-                    dataframes = descargar_y_leer_pdf(Id)
-                    for i, df in enumerate(dataframes):
-                        st.write(f"Tabla {i+1}")
-                        st.table(df)
+                    df_msp = await consulta_cobertura_salud(Id)
+                    st.table(df_msp)
                 except Exception as e:
-                    st.write('Error al leer la información de cobertura de salud')
+                    st.write('Sin información encontrada')
                     st.write(e)
 
             except Exception as e:
